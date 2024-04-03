@@ -1,0 +1,86 @@
+---
+import { readFile } from "fs/promises";
+import Layout from "../../components/Layout.astro";
+import { eventStoreDirectory } from "../../util";
+import { join } from "path";
+import { listTodos } from "./util/listTodos";
+
+const rawEvents = await readFile(
+  join(eventStoreDirectory, "events.jsonl"),
+  "utf-8"
+);
+
+const events = rawEvents
+  .trim()
+  .split("\n")
+  .map((x) => JSON.parse(x));
+
+const todoList = listTodos(events);
+---
+
+<Layout>
+  <h1 class="text-4xl font-bold">My Todo App</h1>
+  <form
+    action="/todo/api/createTodo"
+    method="post"
+    class="grid gap-2 max-w-[65ch]"
+  >
+    <input type="hidden" value="CREATE_TODO" />
+    <label class="text-sm grid gap-1"
+      >Enter a todo item
+      <input
+        type="text"
+        name="label"
+        class="border rounded p-2 text-base"
+        placeholder="Give a talk"
+      /></label
+    >
+    <button class="rounded bg-black text-white p-2">Create</button>
+  </form>
+  <div>
+    <h2 class="text-2xl font-semibold">Your Todos</h2>
+    <hr />
+  </div>
+  <ul>
+    {
+      (todoList ?? []).map((t) => (
+        <li class="flex items-center gap-2">
+          <input
+            data-id={t.id}
+            class="todo-item"
+            type="checkbox"
+            checked={t.isDone}
+          />
+          {t.label} (
+          <form method="post" action="/todo/api/deleteTodo">
+            <input type="hidden" name="id" value={t.id} />
+            <button>Delete</button>
+          </form>
+          )
+        </li>
+      ))
+    }
+  </ul>
+</Layout>
+<script>
+  import type { Event } from "./types";
+
+  document.addEventListener("click", (e) => {
+    if (e.target.className.includes("todo-item")) {
+      const event: Event = {
+        type: e.target.checked ? "DO_TODO" : "UNDO_TODO",
+        payload: {
+          id: e.target.dataset.id,
+        },
+      };
+
+      fetch("/todo/api/doTodo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      });
+    }
+  });
+</script>
