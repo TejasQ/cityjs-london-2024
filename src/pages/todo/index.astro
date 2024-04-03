@@ -10,10 +10,24 @@ const rawEvents = await readFile(
   "utf-8"
 );
 
-const events = rawEvents
+const eventsUntil = Astro.url.searchParams.get("until");
+const isDebug = Astro.url.searchParams.get("debug");
+
+const unpagedEvents = rawEvents
   .trim()
   .split("\n")
-  .map((x) => JSON.parse(x));
+  .map((x) => {
+    try {
+      return JSON.parse(x);
+    } catch {
+      null;
+    }
+  })
+  .filter((t) => t);
+
+const events = eventsUntil
+  ? unpagedEvents.slice(0, parseInt(eventsUntil))
+  : unpagedEvents;
 
 const todoList = listTodos(events);
 ---
@@ -30,6 +44,7 @@ const todoList = listTodos(events);
       >Enter a todo item
       <input
         type="text"
+        autocomplete="off"
         name="label"
         class="border rounded p-2 text-base"
         placeholder="Give a talk"
@@ -61,26 +76,44 @@ const todoList = listTodos(events);
       ))
     }
   </ul>
+  {
+    isDebug && (
+      <div class="fixed bg-white h-screen border-l top-0 right-0">
+        <div class="p-4 grid content-start gap-4 h-[calc(100%-50px)]">
+          <h2 class="text-2xl font-bold">Event Log</h2>
+          <ul>
+            {unpagedEvents.map((e, i) => (
+              <li
+                class:list={[
+                  "font-mono",
+                  i >= parseInt(eventsUntil) && "opacity-30",
+                ]}
+              >
+                <a href={`/todo/?debug=true&until=${i + 1}`}>
+                  {JSON.stringify(e)}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+        <div class="p-4 mt-auto border-t self-end place-self-end">
+          <input
+            type="range"
+            class="w-full"
+            max={unpagedEvents.length}
+            step={1}
+            min={0}
+            value={eventsUntil ? parseInt(eventsUntil) : unpagedEvents.length}
+            id="paginator"
+          />
+        </div>
+      </div>
+    )
+  }
 </Layout>
 <script>
-  import type { Event } from "./types";
-
-  document.addEventListener("click", (e) => {
-    if (e.target.className.includes("todo-item")) {
-      const event: Event = {
-        type: e.target.checked ? "DO_TODO" : "UNDO_TODO",
-        payload: {
-          id: e.target.dataset.id,
-        },
-      };
-
-      fetch("/todo/api/doTodo", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(event),
-      });
-    }
-  });
+  import { doTodo } from "./util/doTodo";
+  import { paginate } from "./util/paginate";
+  document.addEventListener("click", doTodo);
+  document.addEventListener("click", paginate);
 </script>
