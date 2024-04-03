@@ -1,0 +1,17 @@
+model Todo {
+    fields {
+        label Text
+        isDone Boolean? @default(false)
+    }
+
+    actions {
+        list listTodos()
+        update toggleTodo(id)
+        delete deleteTodo(id)
+    }
+
+    @permission(
+        expression: true,
+        actions: [list, update, delete]
+    )
+}
